@@ -1,14 +1,17 @@
 import SwiftUI
 
+/// Main app entry point.
+/// Uses NSApplicationDelegateAdaptor to bridge AppDelegate for AppKit functionality.
+/// The app runs as a menu bar accessory without a dock icon or main window.
 @main
-struct sentientApp: App {
+struct SentientApp: App {
     // Bridge AppDelegate to SwiftUI app lifecycle
+    // This allows us to use AppKit APIs (NSPanel, NSEvent monitors, etc.)
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
     var body: some Scene {
-        // Settings scene, only shows when user goes to App -> Settings
+        // Empty Settings scene (required placeholder for menu bar apps)
         Settings {
-            // Empty for now, add settings later
             EmptyView()
         }
     }

@@ -10,7 +10,7 @@ struct SentientApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
     var body: some Scene {
-        // Empty Settings scene (required placeholder for menu bar apps)
+        // Empty Settings scene
         Settings {
             EmptyView()
         }

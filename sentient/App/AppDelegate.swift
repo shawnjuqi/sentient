@@ -2,33 +2,37 @@ import AppKit
 import SwiftUI
 import KeyboardShortcuts
 
+// AppDelegate handles application lifecycle and system integration.
 class AppDelegate: NSObject, NSApplicationDelegate {
+    
     // MARK: - Properties
     
-    /// Menu bar status item (icon in menu bar)
+    // Menu bar status item (icon in menu bar)
     private var statusItem: NSStatusItem?
     
-    /// Custom floating panel for the overlay
+    // Custom floating panel for the overlay
     private var overlayPanel: OverlayPanel?
     
-    /// Shared speech recognizer instance
-    private var speechRecognizer: SpeechRecognizer?
+    // The ViewModel that drives the overlay UI.
+    // Created once here and passed to all views that need it.
+    private var viewModel: OverlayViewModel?
     
     // MARK: - App Lifecycle
     
     func applicationWillFinishLaunching(_ notification: Notification) {
         // Start as .prohibited: No dock icon, no activation
-        // This prevents the app from appearing in Cmd+Tab
         NSApp.setActivationPolicy(.prohibited)
     }
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Switch to .accessory: No dock icon, but can show windows/panels
-        // This allows our panel to become key and receive input
         NSApp.setActivationPolicy(.accessory)
         
+        // Initialize the ViewModel (this is our "Composition Root")
+        // The ViewModel creates its own services internally
+        viewModel = OverlayViewModel()
+        
         // Initialize components
-        speechRecognizer = SpeechRecognizer()
         setupMenuBar()
         setupOverlayPanel()
         setupKeyboardShortcut()
@@ -101,18 +105,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Position panel in upper-center of screen (like Spotlight)
         let xPos = (screen.frame.width - panelWidth) / 2
-        let yPos = screen.frame.height * 0.65 // Upper third of screen
+        let yPos = screen.frame.height * 0.65
         
         let contentRect = NSRect(x: xPos, y: yPos, width: panelWidth, height: panelHeight)
         
         overlayPanel = OverlayPanel(contentRect: contentRect)
         
         // Create SwiftUI view and host it in the panel
-        if let recognizer = speechRecognizer {
-            let overlayView = OverlayView(speechRecognizer: recognizer)
+        // Here we inject the ViewModel into the View
+        if let vm = viewModel {
+            let overlayView = OverlayView(viewModel: vm)
             let hostingView = NSHostingView(rootView: overlayView)
             
-            // Required for transparent background to work properly
+            // Required for transparent background
             hostingView.wantsLayer = true
             hostingView.layer?.backgroundColor = .clear
             
@@ -123,25 +128,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         overlayPanel?.orderOut(nil)
     }
     
-    // MARK: - Keyboard Shortcuts (using KeyboardShortcuts package)
+    // MARK: - Keyboard Shortcuts
     
     private func setupKeyboardShortcut() {
-        // Register listener for the toggle overlay shortcut
-        // KeyboardShortcuts handles all the complexity:
-        // - Global monitoring (works when other apps are focused)
-        // - Local monitoring (works when this app is focused)
-        // - User customization (stored in UserDefaults)
-        // - Conflict detection with system shortcuts
+        // Toggle overlay visibility
         KeyboardShortcuts.onKeyUp(for: .toggleOverlay) { [weak self] in
             self?.toggleOverlay()
         }
         
-        // Register listener for the toggle recording shortcut
-        // This allows users to start/stop recording from anywhere
-        // Must dispatch to MainActor since SpeechRecognizer is @MainActor isolated
+        // Toggle recording (must dispatch to MainActor for ViewModel)
         KeyboardShortcuts.onKeyUp(for: .toggleRecording) { [weak self] in
             Task { @MainActor in
-                self?.speechRecognizer?.toggleRecording()
+                self?.viewModel?.toggleRecording()
             }
         }
     }
@@ -163,7 +161,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             recenterPanel()
             
             // Activate app FIRST to ensure window operations succeed
-            // This is critical for accessory apps without established window presence
             NSApp.activate(ignoringOtherApps: true)
             
             // Show with animation
